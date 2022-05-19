@@ -81,6 +81,38 @@ int
 sys_pgaccess(void)
 {
   // lab pgtbl: your code here.
+  // pte_t *pte = (pte_t*)0x0000000087f41018;
+  uint64 addr;
+  argaddr(0, &addr);
+  int page_num;
+  argint(1, &page_num);
+  uint64 user_addr;
+  argaddr(2, &user_addr);
+  if (page_num > 64) {
+    return -1;
+  }
+  uint64 ret_mask = 0;
+  struct proc *p = myproc();
+  
+  // printf("%p\n", *pte);
+  // if (*(pte = walk(p->pagetable, addr, 0)) & PTE_A){
+    // ret_mask |= 1;
+  // }
+  pte_t *pteptr = walk(p->pagetable, addr, 0);
+  // printf("%p\n", pte);
+  // printf("%p\n", *pte);
+  pagetable_t start = pteptr;
+  for (int i = 0; i < page_num; i++) {
+    // printf("%p\n", start[i]);
+    if ((start[i] & PTE_A) && (start[i] & PTE_V)) {
+      ret_mask |= (1L << i);
+      start[i] -= PTE_A;
+    }
+    // else if ((start[i] & PTE_A) == 0) {
+      // start[i] |= PTE_A;
+    // }
+  }
+  copyout(p->pagetable, user_addr, (char*)&ret_mask, sizeof(uint64));
   return 0;
 }
 #endif
