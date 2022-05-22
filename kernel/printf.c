@@ -132,3 +132,19 @@ printfinit(void)
   initlock(&pr.lock, "pr");
   pr.locking = 1;
 }
+
+void backtrace() {
+  printf("bakctrace:\n");
+  uint64 current_fp = r_fp(); 
+  // uint64 saved_fp = *(uint64*)(current_fp - 16);
+  // uint64 ra = *(uint64*)(current_fp - 8);
+  uint64 up = PGROUNDUP(current_fp);
+  uint64 down = PGROUNDDOWN(current_fp);
+  while (current_fp <= up && current_fp >= down) {
+    uint64 saved_fp = *(uint64*)(current_fp - 16);
+    uint64 ra = *(uint64*)(current_fp - 8);
+    if (saved_fp <= up && saved_fp >= down)
+      printf("%p\n", ra);
+    current_fp = saved_fp;
+  }
+}
