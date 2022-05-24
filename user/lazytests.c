@@ -16,6 +16,7 @@ sparse_memory(char *s)
   char *i, *prev_end, *new_end;
   
   prev_end = sbrk(REGION_SZ);
+  printf("reach here\n");
   if (prev_end == (char*)0xffffffffffffffffL) {
     printf("sbrk() failed\n");
     exit(1);
@@ -31,7 +32,7 @@ sparse_memory(char *s)
       exit(1);
     }
   }
-
+  printf("exit normally\n");
   exit(0);
 }
 
@@ -40,7 +41,7 @@ sparse_memory_unmap(char *s)
 {
   int pid;
   char *i, *prev_end, *new_end;
-
+  printf("test 2\n");
   prev_end = sbrk(REGION_SZ);
   if (prev_end == (char*)0xffffffffffffffffL) {
     printf("sbrk() failed\n");
@@ -107,6 +108,7 @@ run(void f(char *), char *s) {
   }
   if(pid == 0) {
     f(s);
+    printf("child exit normally\n");
     exit(0);
   } else {
     wait(&xstatus);

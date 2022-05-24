@@ -2392,11 +2392,13 @@ stacktest(char *s)
 {
   int pid;
   int xstatus;
-  
+  printf("before fork sp = %p\n", r_sp());
   pid = fork();
   if(pid == 0) {
     char *sp = (char *) r_sp();
+    printf("stacktest1\n");
     sp -= PGSIZE;
+    printf("stacktest2\n sp = %p\n", sp);
     // the *sp should cause a trap.
     printf("%s: stacktest: read below stack %p\n", *sp);
     exit(1);
@@ -2669,7 +2671,7 @@ main(int argc, char *argv[])
 {
   int continuous = 0;
   char *justone = 0;
-
+  printf("main sp = %p\n", r_sp());
   if(argc == 2 && strcmp(argv[1], "-c") == 0){
     continuous = 1;
   } else if(argc == 2 && strcmp(argv[1], "-C") == 0){
