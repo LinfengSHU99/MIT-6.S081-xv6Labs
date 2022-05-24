@@ -5,6 +5,8 @@
 #include "riscv.h"
 #include "defs.h"
 #include "fs.h"
+#include "spinlock.h"
+#include "proc.h"
 
 /*
  * the kernel's page table.
@@ -96,13 +98,32 @@ walkaddr(pagetable_t pagetable, uint64 va)
 {
   pte_t *pte;
   uint64 pa;
-
+  struct proc* p = myproc();
   if(va >= MAXVA)
     return 0;
 
   pte = walk(pagetable, va, 0);
-  if(pte == 0)
-    return 0;
+  // if a va is not allocated, walk() will return 0 or a pte* whose validation bit is 0, 
+  // depending on the level of pagetable where the walk() finds the va. 
+  if(pte == 0 || (*pte & PTE_V) == 0) {
+    // verify the va
+    if (va > p->trapframe->sp && va < p->sz) {
+      char *mem = kalloc();
+      if (mem == 0) {
+        kfree(mem);
+        return 0;
+      }
+      if (mappages(pagetable, va, PGSIZE, (uint64)mem, PTE_W|PTE_R|PTE_U|PTE_V) != 0) {
+        kfree(mem);
+        uvmdealloc(p->pagetable, va, PGSIZE);
+        return 0;
+      }
+      return (uint64)mem;
+    } 
+    else {
+      return 0;
+    }
+  }
   if((*pte & PTE_V) == 0)
     return 0;
   if((*pte & PTE_U) == 0)
@@ -366,9 +387,27 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 
   while(len > 0){
     va0 = PGROUNDDOWN(dstva);
+    // if (va0 > MAXVA) return -1;
+    // pte_t *pte = walk(pagetable, va0, 0);
+    // if (pte == 0) {
+    //   uvmalloc(pagetable, va0, va0 + PGSIZE);
+    //   continue;
+    //   // pte = walk(pagetable, va0, 1);
+    //   // *pte |= PTE_U;
+    // } 
     pa0 = walkaddr(pagetable, va0);
-    if(pa0 == 0)
-      return -1;
+    if (pa0 == 0) return -1;
+    // pa0 = PTE2PA(*pte);
+    // if((*pte & PTE_U) ==  0) {
+    //   // uvmalloc(pagetable, va0, va0 + PGSIZE);
+    //   // continue;
+    //   return -1;
+    // }
+    // if ((*pte & PTE_V) == 0) {
+    //   uvmalloc(pagetable, va0, va0 + PGSIZE);
+    //   continue;
+    // }
+      
     n = PGSIZE - (dstva - va0);
     if(n > len)
       n = len;
@@ -391,9 +430,27 @@ copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
 
   while(len > 0){
     va0 = PGROUNDDOWN(srcva);
+    // if (va0 > MAXVA) return -1;
+    // pte_t *pte = walk(pagetable, va0, 0);
+    // if (pte == 0) {
+    //   uvmalloc(pagetable, va0, va0 + PGSIZE);
+    //   continue;
+    //   // pte = walk(pagetable, va0, 1);
+    //   // *pte |= PTE_U;
+    // } 
     pa0 = walkaddr(pagetable, va0);
-    if(pa0 == 0)
-      return -1;
+    if (pa0 == 0) return -1;
+    // pa0 = PTE2PA(*pte);
+    // if((*pte & PTE_U) ==  0) {
+    //   // uvmalloc(pagetable, va0, va0 + PGSIZE);
+    //   // continue;
+    //   return -1;
+    // }
+    // if ((*pte & PTE_V) == 0) {
+    //   uvmalloc(pagetable, va0, va0 + PGSIZE);
+    //   continue;
+    // }
+      
     n = PGSIZE - (srcva - va0);
     if(n > len)
       n = len;
