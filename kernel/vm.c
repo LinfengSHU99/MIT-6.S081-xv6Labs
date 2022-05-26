@@ -148,8 +148,8 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
   for(;;){
     if((pte = walk(pagetable, a, 1)) == 0)
       return -1;
-    if(*pte & PTE_V)
-      panic("mappages: remap");
+    // if(*pte & PTE_V)
+    //   panic("mappages: remap");
     *pte = PA2PTE(pa) | perm | PTE_V;
     if(a == last)
       break;
@@ -304,7 +304,7 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   uint64 pa, i;
   uint flags;
   // char *mem;
-  // printf("here\n");
+  printf("here\n");
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
       panic("uvmcopy: pte should exist");
@@ -317,7 +317,9 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
     if (mappages(new, i, PGSIZE, pa, flags) != 0) {
       goto err;
     }
-    addcount(pa);
+    if (pa < PHYSTOP) {
+      operate_pa_count(pa, 1);
+    }
     // if((mem = kalloc()) == 0)
     //   goto err;
     // memmove(mem, (char*)pa, PGSIZE);
@@ -359,33 +361,33 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
     pa0 = walkaddr(pagetable, va0);
     if(pa0 == 0)
       return -1;
-    pte_t *pte;
+    
 
     if(va0 >= MAXVA)
       return -1;
-
-    pte = walk(pagetable, va0, 0);
-    if(pte == 0)
-      return -1;
-    if((*pte & PTE_V) == 0)
-      return -1;
-    if((*pte & PTE_U) == 0)
-      return -1;
-    pa0 = PTE2PA(*pte);
-    if ((*pte & PTE_COW) != 0) {
-      char *mem;
-      mem = kalloc();
-      if (mem == 0) return -1;
-      uint64 flags = PTE_FLAGS(*pte);
-      flags &= (~PTE_COW);
-      flags |= PTE_W;
-      if (mappages(pagetable, va0, PGSIZE, (uint64)mem, flags) != 0) {
-        kfree(mem);
-        uvmdealloc(pagetable, va0, PGSIZE);
-        return -1;
-      }
-      pa0 = (uint64)mem;
-    }
+    // pte_t *pte;
+    // pte = walk(pagetable, va0, 0);
+    // if(pte == 0)
+    //   return -1;
+    // if((*pte & PTE_V) == 0)
+    //   return -1;
+    // if((*pte & PTE_U) == 0)
+    //   return -1;
+    // pa0 = PTE2PA(*pte);
+    // if ((*pte & PTE_COW) != 0) {
+    //   char *mem;
+    //   mem = kalloc();
+    //   if (mem == 0) return -1;
+    //   uint64 flags = PTE_FLAGS(*pte);
+    //   flags &= (~PTE_COW);
+    //   flags |= PTE_W;
+    //   if (mappages(pagetable, va0, PGSIZE, (uint64)mem, flags) != 0) {
+    //     kfree(mem);
+    //     uvmdealloc(pagetable, va0, PGSIZE);
+    //     return -1;
+    //   }
+    //   pa0 = (uint64)mem;
+    // }
     n = PGSIZE - (dstva - va0);
     if(n > len)
       n = len;

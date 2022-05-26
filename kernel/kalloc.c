@@ -14,7 +14,7 @@ void freerange(void *pa_start, void *pa_end);
 extern char end[]; // first address after kernel.
                    // defined by kernel.ld.
 
-#define MAX MAXVA / PGSIZE
+#define MAX (PHYSTOP - KERNBASE) / PGSIZE
 static char pa_count[MAX];
 
 struct run {
@@ -29,10 +29,13 @@ struct {
 void
 kinit()
 {
-  memset(pa_count, 1, 128 * 512);
+  // memset(pa_count, 1, MAX);
+  // for (int i = 0; i < MAX; i++) {
+  //   pa_count[i] = 1;
+  // }
   initlock(&kmem.lock, "kmem");
   freerange(end, (void*)PHYSTOP);
-  memset(pa_count, 0, 128 * 512);
+  // memset(pa_count, 0, MAX);
 }
 
 void
@@ -40,8 +43,10 @@ freerange(void *pa_start, void *pa_end)
 {
   char *p;
   p = (char*)PGROUNDUP((uint64)pa_start);
-  for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE)
+  for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE) {
+    // operate_pa_count((uint64)p, 1);
     kfree(p);
+  }
 }
 
 // Free the page of physical memory pointed at by v,
@@ -57,7 +62,7 @@ kfree(void *pa)
     panic("kfree");
 
   // Fill with junk to catch dangling refs.
-  if ( (uint64)pa >= KERNBASE || --(pa_count[(uint64)pa / PGSIZE]) == 0) {
+  if (operate_pa_count((uint64)pa, 0)  == 0 || operate_pa_count((uint64)pa, -1) == 0 ) {
     memset(pa, 1, PGSIZE);
 
     r = (struct run*)pa;
@@ -82,7 +87,7 @@ kalloc(void)
   r = kmem.freelist;
   if(r){
     kmem.freelist = r->next;
-    pa_count[(uint64)r / PGSIZE]++;
+    operate_pa_count((uint64)r, 1);
   }
   release(&kmem.lock);
 
@@ -91,6 +96,7 @@ kalloc(void)
   return (void*)r;
 }
 
-void addcount(uint64 pa) {
-  pa_count[pa / PGSIZE]++;
+char operate_pa_count(uint64 pa, char i) {
+  pa_count[(pa - KERNBASE) / PGSIZE] += i;
+  return pa_count[(pa - KERNBASE) / PGSIZE];
 }

@@ -69,14 +69,17 @@ usertrap(void)
     // ok
   }
   else if (r_scause() == 15) {
+    // printf("trap\n");
     uint64 va = r_stval();
+    printf("va = %p\n", va);
     uint64 pa = 0;
     pte_t *pte;
-    if ((pte = walk(p->pagetable, va, 0)) != 0 && (*pte & PTE_W) && (*pte & PTE_U)) {
+    if ((pte = walk(p->pagetable, va, 0)) != 0 && !(*pte & PTE_W) && (*pte & PTE_U)) {
       
       if ((*pte & PTE_COW) != 0) {
         uint64 flags = PTE_FLAGS(*pte);
         pa = PTE2PA(*pte);
+        *pte &= (~PTE_V);
         flags |= PTE_W;
         char *mem;
         if ((mem = kalloc()) == 0) {
