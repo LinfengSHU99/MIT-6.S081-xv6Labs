@@ -13,7 +13,9 @@ void freerange(void *pa_start, void *pa_end);
 
 extern char end[]; // first address after kernel.
                    // defined by kernel.ld.
-static char pa_count[128 * 512];
+
+#define MAX MAXVA / PGSIZE
+static char pa_count[MAX];
 
 struct run {
   struct run *next;
@@ -27,8 +29,10 @@ struct {
 void
 kinit()
 {
+  memset(pa_count, 1, 128 * 512);
   initlock(&kmem.lock, "kmem");
   freerange(end, (void*)PHYSTOP);
+  memset(pa_count, 0, 128 * 512);
 }
 
 void
@@ -53,7 +57,7 @@ kfree(void *pa)
     panic("kfree");
 
   // Fill with junk to catch dangling refs.
-  if (--pa_count[(uint64)pa / PGSIZE] == 0) {
+  if ( (uint64)pa >= KERNBASE || --(pa_count[(uint64)pa / PGSIZE]) == 0) {
     memset(pa, 1, PGSIZE);
 
     r = (struct run*)pa;
