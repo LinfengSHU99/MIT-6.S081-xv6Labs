@@ -16,6 +16,26 @@ void kernelvec();
 
 extern int devintr();
 
+uint64 cowfault(pagetable_t pagetable, uint64 va) {
+  pte_t *pte = walk(pagetable, va, 0);
+  if ((*pte == 0) || (*pte & PTE_V) == 0 || (*pte & PTE_U) == 0) {
+    return -1;
+  }
+  if ((*pte & PTE_W) != 0) {
+    panic("cowfault PTE_U != 0\n");
+  }
+  uint64 flags = PTE_FLAGS(*pte);
+  uint64 pa = PTE2PA(*pte);
+  void *new_pa = kalloc();
+  if (new_pa == 0) return -1;
+  uint64 new_pte = PA2PTE(new_pa);
+  memmove(new_pa, (void*)pa, PGSIZE);
+  kfree((void*)pa);
+  *pte = (uint64)new_pte;
+  *pte |= flags | PTE_W;
+  return (uint64)new_pa;
+
+}
 void
 trapinit(void)
 {
@@ -71,31 +91,39 @@ usertrap(void)
   else if (r_scause() == 15) {
     // printf("trap\n");
     uint64 va = r_stval();
-    printf("va = %p\n", va);
-    uint64 pa = 0;
-    pte_t *pte;
-    if ((pte = walk(p->pagetable, va, 0)) != 0 && !(*pte & PTE_W) && (*pte & PTE_U)) {
-      
-      if ((*pte & PTE_COW) != 0) {
-        uint64 flags = PTE_FLAGS(*pte);
-        pa = PTE2PA(*pte);
-        *pte &= (~PTE_V);
-        flags |= PTE_W;
-        char *mem;
-        if ((mem = kalloc()) == 0) {
-          p->killed = 1;
-          goto ret;
-        }
-        memmove(mem, (void*)pa, PGSIZE); 
-        kfree((void*)pa);
-        if (mappages(p->pagetable, va, PGSIZE, (uint64)mem, flags) != 0) {
-          kfree(mem);
-          uvmdealloc(p->pagetable, va, PGSIZE);
-          p->killed = 1;
-          goto ret;
-        }
-      }
+    // printf("va = %p\n", va);
+    if (va >= MAXVA) {
+      p->killed = 1;
+      goto ret;
     }
+    if (cowfault(p->pagetable, va) == -1) {
+      p->killed = 1;
+      goto ret;
+    }
+    // uint64 pa = 0;
+    // pte_t *pte;
+    // if ((pte = walk(p->pagetable, va, 0)) != 0 && !(*pte & PTE_W) && (*pte & PTE_U)) {
+      
+    //   if ((*pte & PTE_COW) != 0) {
+    //     uint64 flags = PTE_FLAGS(*pte);
+    //     pa = PTE2PA(*pte);
+    //     *pte &= (~PTE_V);
+    //     flags |= PTE_W;
+    //     char *mem;
+    //     if ((mem = kalloc()) == 0) {
+    //       p->killed = 1;
+    //       goto ret;
+    //     }
+    //     memmove(mem, (void*)pa, PGSIZE); 
+    //     kfree((void*)pa);
+    //     if (mappages(p->pagetable, va, PGSIZE, (uint64)mem, flags) != 0) {
+    //       kfree(mem);
+    //       uvmdealloc(p->pagetable, va, PGSIZE);
+    //       p->killed = 1;
+    //       goto ret;
+    //     }
+    //   }
+    // }
   }
   else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);

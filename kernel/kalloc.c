@@ -14,7 +14,7 @@ void freerange(void *pa_start, void *pa_end);
 extern char end[]; // first address after kernel.
                    // defined by kernel.ld.
 
-#define MAX (PHYSTOP - KERNBASE) / PGSIZE
+#define MAX (PHYSTOP) / PGSIZE
 static char pa_count[MAX];
 
 struct run {
@@ -44,7 +44,7 @@ freerange(void *pa_start, void *pa_end)
   char *p;
   p = (char*)PGROUNDUP((uint64)pa_start);
   for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE) {
-    // operate_pa_count((uint64)p, 1);
+    operate_pa_count((uint64)p, 1);
     kfree(p);
   }
 }
@@ -62,7 +62,10 @@ kfree(void *pa)
     panic("kfree");
 
   // Fill with junk to catch dangling refs.
-  if (operate_pa_count((uint64)pa, 0)  == 0 || operate_pa_count((uint64)pa, -1) == 0 ) {
+  // acquire(&kmem.lock);
+  char t = operate_pa_count((uint64)pa, -1);
+  // release(&kmem.lock);
+  if (t == 0) {
     memset(pa, 1, PGSIZE);
 
     r = (struct run*)pa;
@@ -87,7 +90,10 @@ kalloc(void)
   r = kmem.freelist;
   if(r){
     kmem.freelist = r->next;
-    operate_pa_count((uint64)r, 1);
+    if (pa_count[(uint64)(r) / PGSIZE] != 0) {
+      panic("kalloc ref\n");
+    }
+    pa_count[(uint64)r / PGSIZE]++;
   }
   release(&kmem.lock);
 
@@ -97,6 +103,8 @@ kalloc(void)
 }
 
 char operate_pa_count(uint64 pa, char i) {
-  pa_count[(pa - KERNBASE) / PGSIZE] += i;
-  return pa_count[(pa - KERNBASE) / PGSIZE];
+  acquire(&kmem.lock);
+  pa_count[(pa) / PGSIZE] += i;
+  release(&kmem.lock);
+  return pa_count[(pa) / PGSIZE];
 }

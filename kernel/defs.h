@@ -141,6 +141,7 @@ int             fetchaddr(uint64, uint64*);
 void            syscall();
 
 // trap.c
+uint64 cowfault(pagetable_t pagetable, uint64 va);
 extern uint     ticks;
 void            trapinit(void);
 void            trapinithart(void);
