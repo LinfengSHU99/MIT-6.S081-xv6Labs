@@ -11,7 +11,29 @@
 #define MAX_THREAD  4
 
 
+struct context {
+  uint64 ra;
+  uint64 sp;
+
+  // callee-saved
+  uint64 s0;
+  uint64 s1;
+  uint64 s2;
+  uint64 s3;
+  uint64 s4;
+  uint64 s5;
+  uint64 s6;
+  uint64 s7;
+  uint64 s8;
+  uint64 s9;
+  uint64 s10;
+  uint64 s11;
+};
+
 struct thread {
+  struct context context;
+  void (*fun)();
+  int first;
   char       stack[STACK_SIZE]; /* the thread's stack */
   int        state;             /* FREE, RUNNING, RUNNABLE */
 };
@@ -29,6 +51,7 @@ thread_init(void)
   // a RUNNABLE thread.
   current_thread = &all_thread[0];
   current_thread->state = RUNNING;
+  current_thread->first = 0;
 }
 
 void 
@@ -62,6 +85,17 @@ thread_schedule(void)
      * Invoke thread_switch to switch from t to next_thread:
      * thread_switch(??, ??);
      */
+    if (current_thread->first != 1) {
+      thread_switch((uint64)&(t->context), (uint64)&(current_thread->context));
+    }
+    else {
+      current_thread->first = 0;
+      thread_switch((uint64)&(t->context), (uint64)&(t->context));
+      if (t != current_thread) {
+        asm volatile ("add sp, x0, %0" : :"r"(&(current_thread->stack[STACK_SIZE - 1])) :);
+        current_thread->fun();
+      }
+    }
   } else
     next_thread = 0;
 }
@@ -76,6 +110,9 @@ thread_create(void (*func)())
   }
   t->state = RUNNABLE;
   // YOUR CODE HERE
+  // 
+  t->fun = func;
+  t->first = 1;
 }
 
 void 
