@@ -73,9 +73,10 @@ testsymlink(void)
 
   if(write(fd1, buf, sizeof(buf)) != 4)
     fail("failed to write to a");
-
+  printf("write\n");
   if (stat_slink("/testsymlink/b", &st) != 0)
     fail("failed to stat b");
+  printf("stat_slink\n");
   if(st.type != T_SYMLINK)
     fail("b isn't a symlink");
 
@@ -93,7 +94,7 @@ testsymlink(void)
   r = symlink("/testsymlink/b", "/testsymlink/a");
   if(r < 0)
     fail("symlink a -> b failed");
-
+  printf("a->b\n");
   r = open("/testsymlink/b", O_RDWR);
   if(r >= 0)
     fail("Should not be able to open b (cycle b->a->b->..)\n");
@@ -101,7 +102,7 @@ testsymlink(void)
   r = symlink("/testsymlink/nonexistent", "/testsymlink/c");
   if(r != 0)
     fail("Symlinking to nonexistent file should succeed\n");
-
+  
   r = symlink("/testsymlink/2", "/testsymlink/1");
   if(r) fail("Failed to link 1->2");
   r = symlink("/testsymlink/3", "/testsymlink/2");

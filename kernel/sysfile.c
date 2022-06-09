@@ -308,6 +308,7 @@ sys_open(void)
       end_op();
       return -1;
     }
+    // printf("reach here\n ");
     ilock(ip);
     if(ip->type == T_DIR && omode != O_RDONLY){
       iunlockput(ip);
@@ -321,7 +322,29 @@ sys_open(void)
     end_op();
     return -1;
   }
+  int cnt = 0;
+  while (ip->type == T_SYMLINK && omode != O_NOFOLLOW && cnt < 10) {
+    cnt++;
+    struct softlink t;
+    readi(ip, 0, (uint64)&t, 0, sizeof(struct softlink));
+    struct inode *t_ip = namei(t.target_name);
+    // struct inode *t_ip = iget(t.dev, t.inum);
+    // printf("%s\n", t.target_name);
+    if (t_ip == 0) {
+      iunlockput(ip);
+      end_op();
+      return -1;
+    }
+    iunlockput(ip);
+    ip = t_ip;
+    ilock(ip);
 
+  }
+  if (cnt >= 10) {
+    iunlockput(ip);
+    end_op();
+    return -1;
+  }
   if((f = filealloc()) == 0 || (fd = fdalloc(f)) < 0){
     if(f)
       fileclose(f);
@@ -483,4 +506,89 @@ sys_pipe(void)
     return -1;
   }
   return 0;
+}
+
+uint64 sys_symlink(void) {
+  char name[DIRSIZ], target[MAXPATH], path[MAXPATH];
+  argstr(0, target, MAXPATH);
+  argstr(1, path, MAXPATH);
+  struct inode *dp, *ip;
+  int cnt = 0;
+
+  begin_op();
+  if ((ip = namei(target)) == 0) {
+    goto out;
+    // end_op();
+    // return 0;
+  }
+  
+  ilock(ip);
+  while (ip->type == T_SYMLINK && cnt < 10) {
+    cnt++;
+    // TODO:
+    struct softlink temp;
+    readi(ip, 0, (uint64)&temp, 0, sizeof(struct softlink));
+    iunlockput(ip);
+    memmove(target, temp.target_name, strlen(temp.target_name)+1);
+    if ((ip = namei(target)) == 0) {
+      goto out;
+      // break;
+      // end_op();
+      // return -1;
+    }
+    // if ((ip = iget(temp.dev, temp.inum)) == 0) {
+    //   end_op();
+    //   return -1;
+    // }
+    ilock(ip);
+  }
+  if (ip->type == T_DIR) {
+      iunlockput(ip);
+      end_op();
+      return -1;
+  }
+  ip->nlink++;
+  
+  
+
+out:;
+  struct inode *new_ip;
+  // if (ip->type == T_FILE) {
+    if ((dp = nameiparent(path, name)) == 0) {
+      goto bad;
+    }
+    ilock(dp);
+    new_ip = ialloc(dp->dev, T_SYMLINK);
+    ilock(new_ip);
+    struct softlink t;
+    // t.dev = ip->dev;
+    // t.inum = ip->inum;
+    memmove(t.target_name, target, strlen(target) + 1);
+    writei(new_ip, 0, (uint64)&t, 0, sizeof(struct softlink));
+    new_ip->nlink = 1;
+    // new_ip->type = T_SYMLINK;
+    if ((dirlink(dp, name, new_ip->inum)) < 0) {
+      iunlockput(dp);
+      goto bad;
+    }
+  // }
+  iunlockput(dp);
+  if (ip != 0) {
+    iupdate(ip);
+    iunlockput(ip);
+  }
+  
+  iupdate(new_ip);
+  iunlockput(new_ip);
+  end_op();
+  return 0;
+  bad:
+  if (ip != 0) {
+    ip->nlink--;
+    iupdate(ip);
+    iunlockput(ip);
+  }
+  
+  end_op();
+  return -1;
 }

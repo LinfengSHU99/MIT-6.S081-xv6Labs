@@ -187,7 +187,7 @@ iinit()
   }
 }
 
-static struct inode* iget(uint dev, uint inum);
+ struct inode* iget(uint dev, uint inum);
 
 // Allocate an inode on device dev.
 // Mark it as allocated by  giving it type type.
@@ -239,7 +239,7 @@ iupdate(struct inode *ip)
 // Find the inode with number inum on device dev
 // and return the in-memory copy. Does not lock
 // the inode and does not read it from disk.
-static struct inode*
+struct inode*
 iget(uint dev, uint inum)
 {
   struct inode *ip, *empty;
@@ -400,7 +400,32 @@ bmap(struct inode *ip, uint bn)
     brelse(bp);
     return addr;
   }
+  bn -= NINDIRECT;
 
+  if (bn < NDOUBLE) {
+    if ((addr = ip->addrs[NDIRECT + 1]) == 0) {
+      ip->addrs[NDIRECT + 1] = addr = balloc(ip->dev);
+    }
+    int off = bn / 256;
+    bp = bread(ip->dev, addr);
+    a = (uint*)bp->data;
+    if ((addr = a[off]) == 0) {
+      a[off] = addr = balloc(ip->dev);
+      log_write(bp);
+    }
+    // brelse(bp);
+    struct buf *bp2;
+    bp2 = bread(ip->dev, addr);
+    uint *aa = (uint*)bp2->data;
+    off = bn % 256;
+    if ((addr = aa[off]) == 0) {
+      aa[off] = addr = balloc(ip->dev);
+      log_write(bp2);
+    }
+    brelse(bp2);
+    brelse(bp);
+    return addr;
+  }
   panic("bmap: out of range");
 }
 
@@ -431,7 +456,30 @@ itrunc(struct inode *ip)
     bfree(ip->dev, ip->addrs[NDIRECT]);
     ip->addrs[NDIRECT] = 0;
   }
-
+  if (ip->addrs[NDIRECT + 1]) {
+    bp = bread(ip->dev, ip->addrs[NDIRECT + 1]);
+    a = (uint*)bp->data;
+    
+    uint *aa = 0;
+    struct buf* bp2;
+    for (int i = 0; i < 256; i++) {
+      
+      if (a[i]) {
+        bp2 = bread(ip->dev, a[i]);    
+        aa = (uint*)bp2->data;
+        for (int j = 0; j < 256; j++) {
+          if (aa[j]) {
+            bfree(ip->dev, aa[j]);
+          }
+        }
+        brelse(bp2);
+        bfree(ip->dev, a[i]);
+      }
+    }
+    brelse(bp);
+    bfree(ip->dev, ip->addrs[NDIRECT + 1]);
+    ip->addrs[NDIRECT + 1] = 0;
+  }
   ip->size = 0;
   iupdate(ip);
 }
@@ -672,3 +720,4 @@ nameiparent(char *path, char *name)
 {
   return namex(path, 1, name);
 }
+
