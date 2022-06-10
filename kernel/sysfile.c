@@ -569,6 +569,7 @@ out:;
     // new_ip->type = T_SYMLINK;
     if ((dirlink(dp, name, new_ip->inum)) < 0) {
       iunlockput(dp);
+      iunlockput(new_ip);
       goto bad;
     }
   // }
