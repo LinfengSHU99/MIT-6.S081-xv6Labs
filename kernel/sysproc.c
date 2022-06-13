@@ -95,3 +95,25 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+uint64 sys_mmap() {
+  uint64 addr = argaddr(0, &addr);
+  int length = argint(1, &length);
+  int prot = argint(2, &prot);
+  int flags = argint(3, &flags);
+  int fd = argint(4, &fd);
+  int offset = argint(5, &offset);
+  if (addr != 0) {
+    panic("mmap: addr != 0\n");
+  }
+  struct proc *proc = myproc();
+  
+  uint64 p = kalloc();
+  mappages()
+  return 0xffffffffffffffff;
+}
+
+uint64 sys_munmap() {
+
+  return 0;
+}
