@@ -4,7 +4,19 @@
 #include "riscv.h"
 #include "spinlock.h"
 #include "proc.h"
+// #include "file.h"
 #include "defs.h"
+
+struct file {
+  enum { FD_NONE, FD_PIPE, FD_INODE, FD_DEVICE } type;
+  int ref; // reference count
+  char readable;
+  char writable;
+  struct pipe *pipe; // FD_PIPE
+  struct inode *ip;  // FD_INODE and FD_DEVICE
+  uint off;          // FD_INODE
+  short major;       // FD_DEVICE
+};
 
 struct spinlock tickslock;
 uint ticks;
@@ -67,7 +79,34 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
-  } else {
+  }
+  else if (r_scause() == 13) {
+    uint64 va = r_stval();
+    // struct vma vma_;
+    int i;
+    for (i = 0; i < p->nvma; i++) {
+      if (va >= p->vma[i].addr && va < p->vma[i].addr + p->vma[i].length) {
+         break;
+      }
+    }
+    if (i == p->nvma) panic("trap: vma not found\n");
+    void *pa = 0;
+    if ((pa = kalloc()) == 0) {
+      kfree(pa);
+      panic("trap: not enough space\n");
+    }
+    memset(pa, 0, PGSIZE);
+    struct file *f = p->vma[i].f;
+   
+    int perm = ((p->vma[i].prot) << 1) | PTE_U;
+    mappages(p->pagetable, va, PGSIZE, (uint64)pa, perm);
+    ilock(f->ip);
+    readi(f->ip, 1, (uint64)va, p->vma[i].offset, PGSIZE);
+    p->vma[i].offset += PGSIZE;
+    iunlock(f->ip);
+
+  } 
+  else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     p->killed = 1;

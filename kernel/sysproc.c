@@ -7,6 +7,8 @@
 #include "spinlock.h"
 #include "proc.h"
 
+
+
 uint64
 sys_exit(void)
 {
@@ -94,4 +96,48 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+uint64 sys_mmap() {
+  struct file *f;
+  uint64 addr;
+  argaddr(0, &addr);
+  int length;
+  argint(1, &length);
+  int prot;
+  argint(2, &prot);
+  int flags;
+  argint(3, &flags);
+  int fd;
+  argint(4, &fd);
+  int offset;
+  argint(5, &offset);
+  
+  if (addr != 0) panic("mmap: addr != 0\n");
+
+  struct proc *proc = myproc();
+  f = proc->ofile[fd];
+  filedup(f);
+  uint64 ret_addr = proc->sz;
+  ret_addr = PGROUNDUP(ret_addr);
+  printf("ori sz = %p  length = %p\n", myproc()->sz, length);
+  proc->sz += (length + ret_addr - proc->sz);
+  printf("sz = %p  ret_addr = %p\n", proc->sz,ret_addr);
+  proc->vma[proc->nvma].addr = ret_addr;
+  proc->vma[proc->nvma].fd = fd;
+  proc->vma[proc->nvma].length = length;
+  proc->vma[proc->nvma].prot = prot;
+  printf("prot = %d\n", proc->vma[proc->nvma].prot);
+  proc->vma[proc->nvma].flags = flags;
+  proc->vma[proc->nvma].offset = offset;
+  proc->vma[proc->nvma].f = f;
+  proc->nvma++;
+  // proc->sz += length;
+  return ret_addr;
+  // return 0xffffffffffffffff;
+}
+
+uint64 sys_munmap() {
+
+  return 0;
 }
