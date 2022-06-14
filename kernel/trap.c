@@ -100,9 +100,10 @@ usertrap(void)
    
     int perm = ((p->vma[i].prot) << 1) | PTE_U;
     mappages(p->pagetable, va, PGSIZE, (uint64)pa, perm);
+    // int off = p->vma[i].offset;
     ilock(f->ip);
-    readi(f->ip, 1, (uint64)va, p->vma[i].offset, PGSIZE);
-    p->vma[i].offset += PGSIZE;
+    
+    p->vma[i].offset += readi(f->ip, 1, (uint64)va, p->vma[i].offset, PGSIZE);
     iunlock(f->ip);
 
   } 
