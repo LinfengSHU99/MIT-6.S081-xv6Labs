@@ -283,6 +283,14 @@ fork(void)
     return -1;
   }
 
+  for (int i = 0; i < p->nvma; i++) {
+    np->vma[i] = p->vma[i];
+    if (p->vma[i].addr != 0) {
+      filedup(np->vma[i].f);
+    }   
+  }
+  np->nvma = p->nvma;
+
   // Copy user memory from parent to child.
   if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
     freeproc(np);
@@ -345,6 +353,20 @@ exit(int status)
 
   if(p == initproc)
     panic("init exiting");
+
+  // unmap
+  int index = 0;
+  for (index = 0; index < p->nvma; index++) {
+    if (p->vma[index].addr != 0 ){
+      // if (p->vma[index].offset > 0) {
+        uvmunmap(p->pagetable, p->vma[index].addr, p->vma[index].length / PGSIZE, 1);
+        
+      // }
+      fileclose(p->vma[index].f);
+      p->vma[index].addr = 0;
+      p->vma[index].length = 0;
+    }
+  }
 
   // Close all open files.
   for(int fd = 0; fd < NOFILE; fd++){

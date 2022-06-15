@@ -274,9 +274,10 @@ fork_test(void)
   // read just 2nd page.
   if(*(p1+PGSIZE) != 'A')
     err("fork mismatch (1)");
-
+  printf("before fork\n");
   if((pid = fork()) < 0)
     err("fork");
+  printf("fork succeeds\n");
   if (pid == 0) {
     _v1(p1);
     munmap(p1, PGSIZE); // just the first page

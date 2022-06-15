@@ -88,6 +88,7 @@ struct vma {
   int prot;
   int flags;
   int offset;
+  
 };
 
 enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };

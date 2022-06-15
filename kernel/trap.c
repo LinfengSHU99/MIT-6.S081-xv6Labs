@@ -89,7 +89,11 @@ usertrap(void)
          break;
       }
     }
-    if (i == p->nvma) panic("trap: vma not found\n");
+    if (i == p->nvma) {
+      // panic("trap: vma not found\n");
+      p->killed = 1;
+      goto out;
+    }
     void *pa = 0;
     if ((pa = kalloc()) == 0) {
       kfree(pa);
@@ -103,7 +107,8 @@ usertrap(void)
     // int off = p->vma[i].offset;
     ilock(f->ip);
     
-    p->vma[i].offset += readi(f->ip, 1, (uint64)va, p->vma[i].offset, PGSIZE);
+    // p->vma[i].offset += readi(f->ip, 1, (uint64)va, p->vma[i].offset, PGSIZE);
+    readi(f->ip, 1, (uint64)va, (uint64)va - p->vma[i].addr, PGSIZE);
     iunlock(f->ip);
 
   } 
@@ -113,6 +118,7 @@ usertrap(void)
     p->killed = 1;
   }
 
+out:
   if(p->killed)
     exit(-1);
 

@@ -194,9 +194,13 @@ uint64 sys_munmap() {
     // ret = (i == n ? n : -1);
     // p->vma[i].offset += length;
   }
-  uint64 npages = length / PGSIZE;
+  // uint64 npages = p->vma[i].offset > length ? length / PGSIZE : p->vma[i].offset / PGSIZE;
+  uint64 npages = length;
   if (length % PGSIZE != 0) panic("munmap: remainder != 0\n");
-  uvmunmap(p->pagetable, addr, npages, 1);
+  // if (addr < p->vma[i].offset) {
+    uvmunmap(p->pagetable, addr, npages, 1);
+    p->vma[i].offset -= npages * PGSIZE;
+  // }
   if (length == p->vma[i].length) {
     fileclose(p->vma[i].f);
     p->vma[i].addr = 0;
@@ -204,6 +208,7 @@ uint64 sys_munmap() {
     // TODO maybe need a circular queue? 
   }
   else {
+  
     p->vma[i].addr = addr + length;
     p->vma[i].length -= length;
   }
